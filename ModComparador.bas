@@ -1,97 +1,95 @@
-Attribute VB_Name = "Comparador"
+'===========================================================
+' COMPARADOR DE EXCELS
+' Pega TODO este bloque en un modulo nuevo del VBE (Alt+F11)
+'===========================================================
 
-'===========================================================
-' IMPORTAR HOY 1
-'===========================================================
 Sub ImportarHoy1()
     ImportarHoja 1
 End Sub
 
-'===========================================================
-' IMPORTAR HOY 2
-'===========================================================
 Sub ImportarHoy2()
     ImportarHoja 2
 End Sub
 
-'===========================================================
-' SUBRUTINA GENÉRICA DE IMPORTACIÓN
-'===========================================================
 Sub ImportarHoja(slot As Integer)
 
-    ' 1) Listar workbooks abiertos (excluir este)
-    Dim nombres() As String
-    Dim wb As Workbook
-    Dim n As Integer
+    Dim nombres()   As String
+    Dim wbLoop      As Workbook
+    Dim n           As Integer
+    Dim i           As Integer
+
+    ' --- 1) Listar workbooks abiertos (excluir este) ---
     n = 0
-    For Each wb In Application.Workbooks
-        If wb.Name <> ThisWorkbook.Name Then
+    For Each wbLoop In Application.Workbooks
+        If wbLoop.Name <> ThisWorkbook.Name Then
             ReDim Preserve nombres(n)
-            nombres(n) = wb.Name
+            nombres(n) = wbLoop.Name
             n = n + 1
         End If
-    Next
+    Next wbLoop
 
     If n = 0 Then
         MsgBox "No hay otros ficheros Excel abiertos." & vbCrLf & _
-               "Abre el fichero que quieres importar y vuelve a pulsar el botón.", _
+               "Abre primero el fichero que quieres importar.", _
                vbExclamation, "Sin ficheros"
         Exit Sub
     End If
 
-    ' 2) Elegir fichero con InputBox de lista
-    Dim lista As String
-    Dim i As Integer
-    lista = "Ficheros abiertos:" & vbCrLf & vbCrLf
+    ' --- 2) Elegir fichero ---
+    Dim lista   As String
+    lista = "Ficheros Excel abiertos:" & vbCrLf & vbCrLf
     For i = 0 To n - 1
-        lista = lista & "  " & (i + 1) & "  -  " & nombres(i) & vbCrLf
-    Next
+        lista = lista & "  " & (i + 1) & "  ->  " & nombres(i) & vbCrLf
+    Next i
+    lista = lista & vbCrLf & "Escribe el numero del fichero:"
 
-    Dim respWB As String
-    respWB = Application.InputBox( _
-        lista & vbCrLf & "Escribe el número del fichero:", _
-        "Seleccionar fichero para HOY " & slot, Type:=1)
+    Dim respWB  As Variant
+    respWB = Application.InputBox(lista, "Importar HOY " & slot, Type:=1)
 
-    If respWB = "False" Then Exit Sub   ' pulsó Cancelar
+    If VarType(respWB) = vbBoolean Then Exit Sub   ' Cancelo
+    If Not IsNumeric(respWB) Then MsgBox "Numero no valido.", vbExclamation: Exit Sub
+
     Dim idxWB As Integer
     idxWB = CInt(respWB) - 1
     If idxWB < 0 Or idxWB >= n Then
-        MsgBox "Número no válido.", vbExclamation
+        MsgBox "Numero fuera de rango (1 a " & n & ").", vbExclamation
         Exit Sub
     End If
 
     Dim wbOrigen As Workbook
     Set wbOrigen = Application.Workbooks(nombres(idxWB))
 
-    ' 3) Elegir hoja del workbook seleccionado
+    ' --- 3) Elegir hoja ---
     Dim hojas() As String
-    Dim m As Integer
+    Dim m       As Integer
     m = wbOrigen.Worksheets.Count
     ReDim hojas(m - 1)
+
     Dim listaH As String
-    listaH = "Hojas de  [" & wbOrigen.Name & "]:" & vbCrLf & vbCrLf
+    listaH = "Hojas de [" & wbOrigen.Name & "]:" & vbCrLf & vbCrLf
     For i = 1 To m
         hojas(i - 1) = wbOrigen.Worksheets(i).Name
-        listaH = listaH & "  " & i & "  -  " & wbOrigen.Worksheets(i).Name & vbCrLf
-    Next
+        listaH = listaH & "  " & i & "  ->  " & wbOrigen.Worksheets(i).Name & vbCrLf
+    Next i
+    listaH = listaH & vbCrLf & "Escribe el numero de la hoja:"
 
-    Dim respWS As String
-    respWS = Application.InputBox( _
-        listaH & vbCrLf & "Escribe el número de la hoja:", _
-        "Seleccionar hoja para HOY " & slot, Type:=1)
+    Dim respWS As Variant
+    respWS = Application.InputBox(listaH, "Importar HOY " & slot, Type:=1)
 
-    If respWS = "False" Then Exit Sub
+    If VarType(respWS) = vbBoolean Then Exit Sub
+    If Not IsNumeric(respWS) Then MsgBox "Numero no valido.", vbExclamation: Exit Sub
+
     Dim idxWS As Integer
     idxWS = CInt(respWS) - 1
     If idxWS < 0 Or idxWS >= m Then
-        MsgBox "Número no válido.", vbExclamation
+        MsgBox "Numero fuera de rango (1 a " & m & ").", vbExclamation
         Exit Sub
     End If
 
     Dim wsOrigen As Worksheet
     Set wsOrigen = wbOrigen.Worksheets(hojas(idxWS))
 
-    ' 4) Nombre para la hoja destino
+    ' --- 4) Construir nombre de hoja destino ---
     Dim nomBase As String
     nomBase = wbOrigen.Name
     Dim p As Integer
@@ -99,80 +97,79 @@ Sub ImportarHoja(slot As Integer)
     If p > 0 Then nomBase = Left(nomBase, p - 1)
     If Len(nomBase) > 20 Then nomBase = Left(nomBase, 20)
 
-    Dim etiqueta As String
-    etiqueta = "HOY " & slot
-
     Dim nomHoja As String
-    nomHoja = nomBase & " [" & etiqueta & "]"
+    nomHoja = nomBase & " [HOY " & slot & "]"
 
-    ' Sanitizar caracteres ilegales en nombre de hoja
     Dim cars As Variant
+    Dim c    As Variant
     cars = Array("/", "\", "?", "*", "[", "]", ":")
-    Dim c As Variant
     For Each c In cars
         nomHoja = Replace(nomHoja, CStr(c), "_")
-    Next
+    Next c
 
-    ' 5) Borrar si ya existe y copiar
+    ' --- 5) Borrar hoja anterior del mismo slot si existe ---
     Application.DisplayAlerts = False
     On Error Resume Next
     ThisWorkbook.Worksheets(nomHoja).Delete
     On Error GoTo 0
     Application.DisplayAlerts = True
 
+    ' --- 6) Copiar hoja ---
     wsOrigen.Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
     ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count).Name = nomHoja
 
-    ' 6) Guardar referencia en MENU!J1 o J2
-    Dim wsMENU As Worksheet
-    Set wsMENU = ThisWorkbook.Worksheets("MENU")
+    ' --- 7) Guardar referencia en MENU J1/J2 ---
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets("MENU")
     If slot = 1 Then
-        wsMENU.Range("J1").Value = nomHoja
+        ws.Range("J1").Value = nomHoja
     Else
-        wsMENU.Range("J2").Value = nomHoja
+        ws.Range("J2").Value = nomHoja
     End If
 
-    ' Volver al MENU
-    wsMENU.Activate
-    MsgBox "Hoja importada correctamente como:" & vbCrLf & vbCrLf & _
-           "  « " & nomHoja & " »", vbInformation, "HOY " & slot & " importado"
+    ws.Activate
+    MsgBox "Hoja importada como:" & vbCrLf & vbCrLf & _
+           "  << " & nomHoja & " >>", vbInformation, "HOY " & slot & " OK"
 End Sub
 
 
 '===========================================================
-' COMPARAR LAS DOS HOJAS
+' COMPARAR
 '===========================================================
 Sub CompararHojas()
 
-    Dim wsMENU As Worksheet
-    Set wsMENU = ThisWorkbook.Worksheets("MENU")
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets("MENU")
 
-    Dim nomH1 As String, nomH2 As String
-    nomH1 = wsMENU.Range("J1").Value
-    nomH2 = wsMENU.Range("J2").Value
+    Dim nomH1 As String
+    Dim nomH2 As String
+    nomH1 = Trim(ws.Range("J1").Value)
+    nomH2 = Trim(ws.Range("J2").Value)
 
-    If Trim(nomH1) = "" Or Trim(nomH2) = "" Then
-        MsgBox "Primero importa las dos hojas (HOY 1 y HOY 2).", _
+    If nomH1 = "" Or nomH2 = "" Then
+        MsgBox "Importa primero las dos hojas (HOY 1 y HOY 2).", _
                vbExclamation, "Faltan hojas"
         Exit Sub
     End If
 
-    Dim ws1 As Worksheet, ws2 As Worksheet
+    Dim ws1 As Worksheet
+    Dim ws2 As Worksheet
+
     On Error Resume Next
     Set ws1 = ThisWorkbook.Worksheets(nomH1)
     Set ws2 = ThisWorkbook.Worksheets(nomH2)
     On Error GoTo 0
 
     If ws1 Is Nothing Then
-        MsgBox "No encuentro la hoja HOY 1: " & nomH1, vbCritical
+        MsgBox "No encuentro la hoja HOY 1:" & vbCrLf & nomH1, vbCritical
         Exit Sub
     End If
     If ws2 Is Nothing Then
-        MsgBox "No encuentro la hoja HOY 2: " & nomH2, vbCritical
+        MsgBox "No encuentro la hoja HOY 2:" & vbCrLf & nomH2, vbCritical
         Exit Sub
     End If
 
-    ' Calcular límites
+    ' --- Limites ---
     Dim lastRow1 As Long, lastCol1 As Long
     Dim lastRow2 As Long, lastCol2 As Long
     lastRow1 = ws1.Cells(ws1.Rows.Count, 1).End(xlUp).Row
@@ -184,23 +181,21 @@ Sub CompararHojas()
     maxRow = Application.Max(lastRow1, lastRow2)
     maxCol = Application.Max(lastCol1, lastCol2)
 
-    ' Eliminar hoja COMPARACION anterior si existe
+    ' --- Borrar COMPARACION anterior ---
     Application.DisplayAlerts = False
     On Error Resume Next
     ThisWorkbook.Worksheets("COMPARACION").Delete
     On Error GoTo 0
     Application.DisplayAlerts = True
 
-    ' Crear hoja COMPARACION al final
+    ' --- Crear hoja COMPARACION ---
     Dim wsC As Worksheet
     Set wsC = ThisWorkbook.Worksheets.Add( _
         After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
     wsC.Name = "COMPARACION"
 
-    ' Copiar cabecera de ws1
     ws1.Rows(1).Copy wsC.Rows(1)
 
-    ' Cabecera columna DIFERENTE
     Dim colDif As Long
     colDif = maxCol + 1
     With wsC.Cells(1, colDif)
@@ -210,19 +205,20 @@ Sub CompararHojas()
         .Interior.Color = RGB(31, 78, 121)
     End With
 
-    ' Recorrer filas de datos
+    ' --- Recorrer filas ---
     Application.ScreenUpdating = False
 
-    Dim fila As Long, col As Long
-    Dim v1 As String, v2 As String
+    Dim fila    As Long
+    Dim col     As Long
+    Dim v1      As String
+    Dim v2      As String
     Dim difFila As Boolean
-    Dim filaC As Long
+    Dim filaC   As Long
     filaC = 2
 
     For fila = 2 To maxRow
         difFila = False
 
-        ' Comprobar si alguna celda difiere
         For col = 1 To maxCol
             v1 = ""
             v2 = ""
@@ -234,21 +230,17 @@ Sub CompararHojas()
             End If
         Next col
 
-        ' Copiar fila base (desde ws1 si existe, si no desde ws2)
         If fila <= lastRow1 Then
             ws1.Rows(fila).Copy wsC.Rows(filaC)
         Else
             ws2.Rows(fila).Copy wsC.Rows(filaC)
         End If
 
-        ' Marcar resultado
         If difFila Then
             wsC.Cells(filaC, colDif).Value = "SI"
             wsC.Cells(filaC, colDif).Font.Color = RGB(192, 57, 43)
             wsC.Cells(filaC, colDif).Font.Bold = True
             wsC.Rows(filaC).Interior.Color = RGB(255, 235, 235)
-
-            ' Colorear celdas que cambian
             For col = 1 To maxCol
                 v1 = ""
                 v2 = ""
@@ -267,7 +259,7 @@ Sub CompararHojas()
         filaC = filaC + 1
     Next fila
 
-    ' Formato final
+    ' --- Formato cabecera y autofiltro ---
     With wsC.Rows(1)
         .Font.Bold = True
         .Interior.Color = RGB(31, 78, 121)
@@ -284,16 +276,13 @@ Sub CompararHojas()
 
     Application.ScreenUpdating = True
 
-    ' Resumen
     Dim totalDif As Long
-    totalDif = Application.WorksheetFunction.CountIf( _
-        wsC.Columns(colDif), "SI")
+    totalDif = Application.WorksheetFunction.CountIf(wsC.Columns(colDif), "SI")
 
-    MsgBox "Comparación completada." & vbCrLf & vbCrLf & _
+    MsgBox "Comparacion completada." & vbCrLf & vbCrLf & _
            "  Filas analizadas : " & (maxRow - 1) & vbCrLf & _
            "  Filas DIFERENTES : " & totalDif & vbCrLf & _
            "  Filas IGUALES    : " & (maxRow - 1 - totalDif) & vbCrLf & vbCrLf & _
-           "La hoja COMPARACION está lista." & vbCrLf & _
            "Filtra DIFERENTE = SI para ver solo los cambios.", _
            vbInformation, "Resultado"
 End Sub
