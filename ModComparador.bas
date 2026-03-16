@@ -425,29 +425,42 @@ Sub CompararHojas()
             End If
         Next col
 
-        ' Marcar fila
-        If difFila Then
-            wsC.Rows(filaC).Interior.Color = RGB(255, 235, 235)
+        ' Marcar fila segun estado
+        If estado = "SI" Then
+            ' Fondo blanco, celdas v2 distintas en rojo oscuro
             With wsC.Cells(filaC, colDif)
-                .Value = estado
+                .Value = "SI"
                 .Font.Bold = True
                 .Font.Color = RGB(192, 57, 43)
             End With
-            ' Marcar en rojo oscuro las celdas v2 que difieren (solo si existe en ambas)
-            If estado = "SI" Then
-                For col = 1 To maxCol
-                    colC = (col - 1) * 2 + 1
-                    If CStr(wsC.Cells(filaC, colC).Value) <> _
-                       CStr(wsC.Cells(filaC, colC + 1).Value) Then
-                        With wsC.Cells(filaC, colC + 1)
-                            .Interior.Color = RGB(139, 0, 0)
-                            .Font.Color = RGB(255, 255, 255)
-                            .Font.Bold = True
-                        End With
-                    End If
-                Next col
-            End If
+            For col = 1 To maxCol
+                colC = (col - 1) * 2 + 1
+                If CStr(wsC.Cells(filaC, colC).Value) <> _
+                   CStr(wsC.Cells(filaC, colC + 1).Value) Then
+                    With wsC.Cells(filaC, colC + 1)
+                        .Interior.Color = RGB(139, 0, 0)
+                        .Font.Color = RGB(255, 255, 255)
+                        .Font.Bold = True
+                    End With
+                End If
+            Next col
+
+        ElseIf estado = "SOLO EN V1" Or estado = "SOLO EN V2" Then
+            ' Fondo azul suave + tachado en toda la fila de datos
+            wsC.Rows(filaC).Interior.Color = RGB(213, 229, 242)
+            With wsC.Range(wsC.Cells(filaC, 1), wsC.Cells(filaC, colDif - 1)).Font
+                .Strikethrough = True
+                .Color = RGB(80, 80, 80)
+            End With
+            With wsC.Cells(filaC, colDif)
+                .Value = estado
+                .Font.Bold = True
+                .Font.Strikethrough = False
+                .Font.Color = RGB(31, 78, 121)
+            End With
+
         Else
+            ' Igual: fondo blanco, verde en DIFERENTE
             With wsC.Cells(filaC, colDif)
                 .Value = "NO"
                 .Font.Color = RGB(39, 174, 96)
