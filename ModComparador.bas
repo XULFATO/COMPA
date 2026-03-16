@@ -12,17 +12,46 @@ Sub ImportarHoy2()
 End Sub
 
 '-----------------------------------------------------------
+' BORRAR todas las hojas excepto MENU
+'-----------------------------------------------------------
+Sub BorrarTodo()
+
+    Dim resp As Integer
+    resp = MsgBox("Se eliminaran todas las hojas excepto MENU." & vbCrLf & _
+                  "Esto incluye las importadas y la comparacion." & vbCrLf & vbCrLf & _
+                  "Continuar?", vbQuestion + vbYesNo, "Confirmar borrado")
+    If resp = vbNo Then Exit Sub
+
+    Dim wsMenu As Worksheet
+    Set wsMenu = ThisWorkbook.Worksheets("MENU")
+    wsMenu.Range("J1").Value = ""
+    wsMenu.Range("J2").Value = ""
+
+    Application.DisplayAlerts = False
+    Dim ws As Worksheet
+    For Each ws In ThisWorkbook.Worksheets
+        If ws.Name <> "MENU" Then ws.Delete
+    Next ws
+    Application.DisplayAlerts = True
+
+    wsMenu.Activate
+    MsgBox "Listo. Solo queda la hoja MENU.", vbInformation, "Borrado completado"
+End Sub
+
+
+'-----------------------------------------------------------
+' IMPORTAR HOJA (slot = 1 o 2)
+'-----------------------------------------------------------
 Sub ImportarHoja(slot As Integer)
 
-    ' Referencia a MENU capturada AL INICIO, antes de cualquier Copy
     Dim wsMenu As Worksheet
     Set wsMenu = ThisWorkbook.Worksheets("MENU")
 
     ' --- 1) Listar workbooks abiertos (excluir este) ---
-    Dim nombres()  As String
-    Dim wbLoop     As Workbook
-    Dim n          As Integer
-    Dim i          As Integer
+    Dim nombres() As String
+    Dim wbLoop    As Workbook
+    Dim n         As Integer
+    Dim i         As Integer
     n = 0
 
     For Each wbLoop In Application.Workbooks
@@ -50,8 +79,8 @@ Sub ImportarHoja(slot As Integer)
 
     Dim respWB As Variant
     respWB = Application.InputBox(lista, "Importar HOY " & slot, Type:=1)
-
     If VarType(respWB) = vbBoolean Then Exit Sub
+
     Dim idxWB As Integer
     idxWB = CInt(respWB) - 1
     If idxWB < 0 Or idxWB >= n Then
@@ -78,8 +107,8 @@ Sub ImportarHoja(slot As Integer)
 
     Dim respWS As Variant
     respWS = Application.InputBox(listaH, "Importar HOY " & slot, Type:=1)
-
     If VarType(respWS) = vbBoolean Then Exit Sub
+
     Dim idxWS As Integer
     idxWS = CInt(respWS) - 1
     If idxWS < 0 Or idxWS >= m Then
@@ -90,7 +119,7 @@ Sub ImportarHoja(slot As Integer)
     Dim wsOrigen As Worksheet
     Set wsOrigen = wbOrigen.Worksheets(hojas(idxWS))
 
-    ' --- 4) Nombre de hoja destino: igual que el original, con sufijo v1 o v2 ---
+    ' --- 4) Nombre: nombre original + sufijo v1 o v2 ---
     Dim nomBase As String
     nomBase = wsOrigen.Name
     If Len(nomBase) > 25 Then nomBase = Left(nomBase, 25)
@@ -98,7 +127,6 @@ Sub ImportarHoja(slot As Integer)
     Dim nomHoja As String
     nomHoja = nomBase & " v" & slot
 
-    ' Sanitizar caracteres ilegales en nombre de hoja
     Dim cars As Variant
     Dim c    As Variant
     cars = Array("/", "\", "?", "*", "[", "]", ":")
@@ -113,16 +141,15 @@ Sub ImportarHoja(slot As Integer)
     On Error GoTo 0
     Application.DisplayAlerts = True
 
-    ' --- 6) Copiar hoja al final de este workbook ---
-    ' Guardar referencia al libro ANTES del Copy (el Copy puede cambiar el libro activo)
-    Dim wbThis As Workbook
-    Set wbThis = ThisWorkbook
+    ' --- 6) Copiar hoja al final ---
+    Dim wbThis     As Workbook
     Dim totalHojas As Integer
+    Set wbThis = ThisWorkbook
     totalHojas = wbThis.Worksheets.Count
     wsOrigen.Copy After:=wbThis.Worksheets(totalHojas)
     wbThis.Worksheets(wbThis.Worksheets.Count).Name = nomHoja
 
-    ' --- 7) Guardar referencia (wsMenu ya capturada al inicio) ---
+    ' --- 7) Guardar referencia en MENU ---
     If slot = 1 Then
         wsMenu.Range("J1").Value = nomHoja
     Else
@@ -136,11 +163,16 @@ End Sub
 
 
 '===========================================================
-' COMPARAR - formato doble columna v1/v2 por cada campo
+' COMPARAR
+' - Cruza por Employee ID (no por posicion de fila)
+' - IDs solo en v1 -> v2 en blanco, DIFERENTE = "SOLO EN V1"
+' - IDs solo en v2 -> v1 en blanco, DIFERENTE = "SOLO EN V2"
+' - IDs en ambos   -> compara campo a campo
+' - Borde grueso al final de cada grupo de columnas
+' - Ancho autoajustado sin recortar texto
 '===========================================================
 Sub CompararHojas()
 
-    ' Referencia a MENU capturada AL INICIO
     Dim wsMenu As Worksheet
     Set wsMenu = ThisWorkbook.Worksheets("MENU")
 
@@ -171,45 +203,129 @@ Sub CompararHojas()
         Exit Sub
     End If
 
-    ' --- Limites de datos ---
+    ' --- Limites ---
     Dim lastRow1 As Long, lastCol1 As Long
     Dim lastRow2 As Long, lastCol2 As Long
     lastRow1 = ws1.Cells(ws1.Rows.Count, 1).End(xlUp).Row
     lastCol1 = ws1.Cells(1, ws1.Columns.Count).End(xlToLeft).Column
     lastRow2 = ws2.Cells(ws2.Rows.Count, 1).End(xlUp).Row
     lastCol2 = ws2.Cells(1, ws2.Columns.Count).End(xlToLeft).Column
-
-    Dim maxRow As Long
     Dim maxCol As Long
-    maxRow = Application.Max(lastRow1, lastRow2)
     maxCol = Application.Max(lastCol1, lastCol2)
 
-    ' --- Borrar COMPARACION anterior si existe ---
+    ' --- Localizar columna Employee ID en ambas hojas ---
+    Dim colEmp1 As Long
+    Dim colEmp2 As Long
+    Dim col     As Long
+    colEmp1 = 0
+    colEmp2 = 0
+
+    For col = 1 To lastCol1
+        If LCase(Trim(CStr(ws1.Cells(1, col).Value))) = "employee id" Then
+            colEmp1 = col
+            Exit For
+        End If
+    Next col
+    For col = 1 To lastCol2
+        If LCase(Trim(CStr(ws2.Cells(1, col).Value))) = "employee id" Then
+            colEmp2 = col
+            Exit For
+        End If
+    Next col
+
+    If colEmp1 = 0 Or colEmp2 = 0 Then
+        MsgBox "No se encuentra 'Employee ID' en " & _
+               IIf(colEmp1 = 0, nomH1, nomH2) & "." & vbCrLf & _
+               "Verifica que el nombre es exactamente 'Employee ID'.", _
+               vbExclamation, "Columna no encontrada"
+        Exit Sub
+    End If
+
+    ' --- Indice de ws2: Employee ID -> numero de fila ---
+    Dim idx2Keys() As String
+    Dim idx2Rows() As Long
+    Dim nIdx2      As Long
+    nIdx2 = lastRow2 - 1
+    ReDim idx2Keys(1 To nIdx2)
+    ReDim idx2Rows(1 To nIdx2)
+    Dim e As Long
+    For e = 1 To nIdx2
+        idx2Keys(e) = CStr(ws2.Cells(e + 1, colEmp2).Value)
+        idx2Rows(e) = e + 1
+    Next e
+
+    ' --- Union ordenada de todos los Employee IDs ---
+    Dim allIDs() As String
+    Dim nAll     As Long
+    Dim fila     As Long
+    Dim found    As Boolean
+    Dim k        As Long
+    nAll = 0
+
+    For fila = 2 To lastRow1
+        Dim id1 As String
+        id1 = CStr(ws1.Cells(fila, colEmp1).Value)
+        If id1 <> "" Then
+            found = False
+            For k = 1 To nAll
+                If allIDs(k) = id1 Then found = True: Exit For
+            Next k
+            If Not found Then
+                nAll = nAll + 1
+                ReDim Preserve allIDs(1 To nAll)
+                allIDs(nAll) = id1
+            End If
+        End If
+    Next fila
+
+    For e = 1 To nIdx2
+        Dim id2 As String
+        id2 = idx2Keys(e)
+        If id2 <> "" Then
+            found = False
+            For k = 1 To nAll
+                If allIDs(k) = id2 Then found = True: Exit For
+            Next k
+            If Not found Then
+                nAll = nAll + 1
+                ReDim Preserve allIDs(1 To nAll)
+                allIDs(nAll) = id2
+            End If
+        End If
+    Next e
+
+    ' Ordenar allIDs (burbuja)
+    Dim tmp As String
+    Dim j   As Long
+    For k = 1 To nAll - 1
+        For j = 1 To nAll - k
+            If allIDs(j) > allIDs(j + 1) Then
+                tmp = allIDs(j)
+                allIDs(j) = allIDs(j + 1)
+                allIDs(j + 1) = tmp
+            End If
+        Next j
+    Next k
+
+    ' --- Borrar COMPARACION anterior ---
     Application.DisplayAlerts = False
     On Error Resume Next
     ThisWorkbook.Worksheets("COMPARACION").Delete
     On Error GoTo 0
     Application.DisplayAlerts = True
 
-    ' --- Crear hoja COMPARACION al final ---
+    ' --- Crear hoja COMPARACION ---
     Dim wsC As Worksheet
     Set wsC = ThisWorkbook.Worksheets.Add( _
         After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
     wsC.Name = "COMPARACION"
 
-    ' -------------------------------------------------------
-    ' CABECERA FILA 1: nombre del campo (fusionado v1+v2)
-    ' CABECERA FILA 2: etiquetas v1 / v2
-    ' Cada campo ocupa 2 columnas en la hoja resultado.
-    ' Columna DIFERENTE va al final (col 2*maxCol + 1)
-    ' -------------------------------------------------------
-    Dim col       As Long
-    Dim colC      As Long   ' columna destino en wsC (1-based)
-    Dim cabecera  As String
+    ' --- Cabeceras ---
+    Dim colC     As Long
+    Dim cabecera As String
 
     For col = 1 To maxCol
-        colC = (col - 1) * 2 + 1   ' columna v1
-        ' Nombre del campo (de ws1 si existe, si no de ws2)
+        colC = (col - 1) * 2 + 1
         If col <= lastCol1 Then
             cabecera = CStr(ws1.Cells(1, col).Value)
         ElseIf col <= lastCol2 Then
@@ -217,98 +333,120 @@ Sub CompararHojas()
         Else
             cabecera = "Campo" & col
         End If
-
-        ' Fila 1: cabecera fusionada (v1 y v2 juntas)
         wsC.Range(wsC.Cells(1, colC), wsC.Cells(1, colC + 1)).Merge
         wsC.Cells(1, colC).Value = cabecera
-
-        ' Fila 2: etiquetas v1 / v2
         wsC.Cells(2, colC).Value = "v1"
         wsC.Cells(2, colC + 1).Value = "v2"
     Next col
 
-    ' Cabecera columna DIFERENTE
     Dim colDif As Long
     colDif = maxCol * 2 + 1
-
     wsC.Cells(1, colDif).Value = "DIFERENTE"
     wsC.Cells(2, colDif).Value = ""
 
-    ' --- Formato cabeceras ---
-    ' Fila 1: azul oscuro
+    ' Formato fila 1
     With wsC.Rows(1)
         .Font.Bold = True
         .Font.Color = RGB(255, 255, 255)
         .Interior.Color = RGB(31, 78, 121)
         .HorizontalAlignment = xlCenter
         .VerticalAlignment = xlCenter
+        .RowHeight = 20
     End With
-    ' Fila 2: azul medio para v1/v2
+    ' Formato fila 2
     With wsC.Rows(2)
         .Font.Bold = True
         .Font.Color = RGB(255, 255, 255)
         .Interior.Color = RGB(41, 128, 185)
         .HorizontalAlignment = xlCenter
         .VerticalAlignment = xlCenter
+        .RowHeight = 18
     End With
-    ' Columna DIFERENTE fila 2: mantener azul oscuro
-    With wsC.Cells(2, colDif)
-        .Interior.Color = RGB(31, 78, 121)
-    End With
+    wsC.Cells(2, colDif).Interior.Color = RGB(31, 78, 121)
 
-    ' --- Recorrer filas de datos (desde fila 2 del origen = fila 3 del resultado) ---
+    ' --- Escribir datos cruzados por Employee ID ---
     Application.ScreenUpdating = False
 
-    Dim fila    As Long
+    Dim filaC   As Long
+    Dim r1      As Long
+    Dim r2      As Long
     Dim v1      As String
     Dim v2      As String
     Dim difFila As Boolean
-    Dim filaC   As Long
+    Dim estado  As String
     filaC = 3
 
-    For fila = 2 To maxRow
+    For k = 1 To nAll
+        Dim empID As String
+        empID = allIDs(k)
 
+        ' Buscar en ws1
+        r1 = 0
+        For fila = 2 To lastRow1
+            If CStr(ws1.Cells(fila, colEmp1).Value) = empID Then
+                r1 = fila
+                Exit For
+            End If
+        Next fila
+
+        ' Buscar en ws2
+        r2 = 0
+        For e = 1 To nIdx2
+            If idx2Keys(e) = empID Then
+                r2 = idx2Rows(e)
+                Exit For
+            End If
+        Next e
+
+        ' Estado inicial
         difFila = False
+        If r1 = 0 Then
+            estado = "SOLO EN V2"
+            difFila = True
+        ElseIf r2 = 0 Then
+            estado = "SOLO EN V1"
+            difFila = True
+        Else
+            estado = "NO"
+        End If
 
-        ' Escribir valores v1 y v2 en cada par de columnas
+        ' Escribir valores
         For col = 1 To maxCol
             colC = (col - 1) * 2 + 1
             v1 = ""
             v2 = ""
-            If col <= lastCol1 And fila <= lastRow1 Then v1 = CStr(ws1.Cells(fila, col).Value)
-            If col <= lastCol2 And fila <= lastRow2 Then v2 = CStr(ws2.Cells(fila, col).Value)
-
+            If r1 > 0 And col <= lastCol1 Then v1 = CStr(ws1.Cells(r1, col).Value)
+            If r2 > 0 And col <= lastCol2 Then v2 = CStr(ws2.Cells(r2, col).Value)
             wsC.Cells(filaC, colC).Value = v1
             wsC.Cells(filaC, colC + 1).Value = v2
-
-            If v1 <> v2 Then difFila = True
+            If estado = "NO" And v1 <> v2 Then
+                estado = "SI"
+                difFila = True
+            End If
         Next col
 
-        ' Marcar fila y celdas diferentes
+        ' Marcar fila
         If difFila Then
-            ' Fondo suave en toda la fila
             wsC.Rows(filaC).Interior.Color = RGB(255, 235, 235)
-
-            ' Columna DIFERENTE
             With wsC.Cells(filaC, colDif)
-                .Value = "SI"
+                .Value = estado
                 .Font.Bold = True
                 .Font.Color = RGB(192, 57, 43)
             End With
-
-            ' Marcar en rojo oscuro solo las celdas v2 que difieren
-            For col = 1 To maxCol
-                colC = (col - 1) * 2 + 1
-                v1 = CStr(wsC.Cells(filaC, colC).Value)
-                v2 = CStr(wsC.Cells(filaC, colC + 1).Value)
-                If v1 <> v2 Then
-                    With wsC.Cells(filaC, colC + 1)
-                        .Interior.Color = RGB(139, 0, 0)
-                        .Font.Color = RGB(255, 255, 255)
-                        .Font.Bold = True
-                    End With
-                End If
-            Next col
+            ' Marcar en rojo oscuro las celdas v2 que difieren (solo si existe en ambas)
+            If estado = "SI" Then
+                For col = 1 To maxCol
+                    colC = (col - 1) * 2 + 1
+                    If CStr(wsC.Cells(filaC, colC).Value) <> _
+                       CStr(wsC.Cells(filaC, colC + 1).Value) Then
+                        With wsC.Cells(filaC, colC + 1)
+                            .Interior.Color = RGB(139, 0, 0)
+                            .Font.Color = RGB(255, 255, 255)
+                            .Font.Bold = True
+                        End With
+                    End If
+                Next col
+            End If
         Else
             With wsC.Cells(filaC, colDif)
                 .Value = "NO"
@@ -317,28 +455,61 @@ Sub CompararHojas()
         End If
 
         filaC = filaC + 1
-    Next fila
+    Next k
 
-    ' --- Autofiltro en fila 2 (v1/v2), congelar primeras 2 filas ---
-    ' Fila 1 tiene celdas fusionadas: el AutoFilter va en fila 2
-    wsC.Rows(2).AutoFilter
+    ' --- Bordes gruesos al final de cada grupo (borde derecho de cada columna v2) ---
+    Dim lastDataRow As Long
+    lastDataRow = filaC - 1
+
+    For col = 1 To maxCol
+        colC = (col - 1) * 2 + 2   ' columna v2 de cada grupo
+        With wsC.Range(wsC.Cells(1, colC), wsC.Cells(lastDataRow, colC)).Borders(xlEdgeRight)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+            .Color = RGB(31, 78, 121)
+        End With
+    Next col
+
+    With wsC.Range(wsC.Cells(1, colDif), wsC.Cells(lastDataRow, colDif)).Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .Weight = xlMedium
+        .Color = RGB(31, 78, 121)
+    End With
+
+    ' --- Autoajuste de ancho (minimo 8, maximo 40) ---
     wsC.Cells.EntireColumn.AutoFit
+    Dim cIdx As Long
+    For cIdx = 1 To colDif
+        With wsC.Columns(cIdx)
+            If .ColumnWidth < 8 Then .ColumnWidth = 8
+            If .ColumnWidth > 40 Then .ColumnWidth = 40
+        End With
+    Next cIdx
 
+    ' --- Autofiltro en fila 2 (sin celdas fusionadas) ---
+    wsC.Rows(2).AutoFilter
+
+    ' --- Congelar las 2 filas de cabecera ---
     Application.ScreenUpdating = True
-
     wsC.Activate
     wsC.Rows(3).Select
     ActiveWindow.FreezePanes = True
     wsC.Range("A1").Select
 
     ' --- Resumen ---
-    Dim totalDif As Long
-    totalDif = Application.WorksheetFunction.CountIf(wsC.Columns(colDif), "SI")
+    Dim totalSI     As Long
+    Dim totalSoloV1 As Long
+    Dim totalSoloV2 As Long
+    totalSI     = Application.WorksheetFunction.CountIf(wsC.Columns(colDif), "SI")
+    totalSoloV1 = Application.WorksheetFunction.CountIf(wsC.Columns(colDif), "SOLO EN V1")
+    totalSoloV2 = Application.WorksheetFunction.CountIf(wsC.Columns(colDif), "SOLO EN V2")
 
     MsgBox "Comparacion completada." & vbCrLf & vbCrLf & _
-           "  Filas analizadas : " & (maxRow - 1) & vbCrLf & _
-           "  Filas DIFERENTES : " & totalDif & vbCrLf & _
-           "  Filas IGUALES    : " & (maxRow - 1 - totalDif) & vbCrLf & vbCrLf & _
-           "Filtra DIFERENTE = SI para ver solo los cambios.", _
+           "  Registros totales : " & nAll & vbCrLf & _
+           "  Campos diferentes : " & totalSI & vbCrLf & _
+           "  Solo en v1        : " & totalSoloV1 & vbCrLf & _
+           "  Solo en v2        : " & totalSoloV2 & vbCrLf & _
+           "  Iguales           : " & (nAll - totalSI - totalSoloV1 - totalSoloV2) & vbCrLf & vbCrLf & _
+           "Filtra columna DIFERENTE para ver los cambios.", _
            vbInformation, "Resultado"
 End Sub
