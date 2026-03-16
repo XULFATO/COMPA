@@ -133,8 +133,6 @@ Sub ImportarHoja(slot As Integer)
     End If
 
     wsMenu.Activate
-    MsgBox "Hoja importada como:" & vbCrLf & vbCrLf & _
-           "  << " & nomHoja & " >>", vbInformation, "HOY " & slot & " OK"
 End Sub
 
 
@@ -311,8 +309,8 @@ Sub CompararHojas()
         End If
         wsC.Range(wsC.Cells(1, colC), wsC.Cells(1, colC + 1)).Merge
         wsC.Cells(1, colC).Value = cabecera
-        wsC.Cells(2, colC).Value = "v1"
-        wsC.Cells(2, colC + 1).Value = "v2"
+        wsC.Cells(2, colC).Value = "PAGE1"
+        wsC.Cells(2, colC + 1).Value = "PAGE2"
     Next col
 
     Dim colDif As Long
@@ -413,9 +411,10 @@ Sub CompararHojas()
         If estado = "SI" Then
             ' Fondo blanco, celdas v2 distintas en rojo oscuro
             With wsC.Cells(filaC, colDif)
-                .Value = "SI"
+                .Value = "DIFERENTES"
                 .Font.Bold = True
-                .Font.Color = RGB(192, 57, 43)
+                .Font.Color = RGB(255, 255, 255)
+                .Interior.Color = RGB(192, 57, 43)
             End With
             For col = 1 To maxCol
                 colC = (col - 1) * 2 + 1
@@ -436,20 +435,32 @@ Sub CompararHojas()
                 .Strikethrough = True
                 .Color = RGB(80, 80, 80)
             End With
-            wsC.Cells(filaC, colDif).Value = ""
-            wsC.Cells(filaC, colDif).Font.Strikethrough = False
+            With wsC.Cells(filaC, colDif)
+                .Value = "SOLO EN V1"
+                .Font.Bold = True
+                .Font.Strikethrough = False
+                .Font.Color = RGB(255, 255, 255)
+                .Interior.Color = RGB(31, 78, 121)
+            End With
 
         ElseIf estado = "SOLO EN V2" Then
             ' Solo en V2 (alta nueva): fondo verde suave, sin tachado
             wsC.Rows(filaC).Interior.Color = RGB(198, 239, 206)
-            wsC.Cells(filaC, colDif).Value = ""
-            wsC.Cells(filaC, colDif).Font.Strikethrough = False
+            With wsC.Cells(filaC, colDif)
+                .Value = "SOLO EN V2"
+                .Font.Bold = True
+                .Font.Strikethrough = False
+                .Font.Color = RGB(255, 255, 255)
+                .Interior.Color = RGB(21, 101, 71)
+            End With
 
         Else
             ' Igual: fondo blanco, verde en DIFERENTE
             With wsC.Cells(filaC, colDif)
-                .Value = "NO"
-                .Font.Color = RGB(39, 174, 96)
+                .Value = "IGUALES"
+                .Font.Bold = True
+                .Font.Color = RGB(255, 255, 255)
+                .Interior.Color = RGB(39, 120, 56)
             End With
         End If
 
@@ -509,10 +520,10 @@ Sub CompararHojas()
     ' --- Resumen ---
     MsgBox "Comparacion completada." & vbCrLf & vbCrLf & _
            "  Registros totales : " & nAll & vbCrLf & _
-           "  Campos diferentes : " & cntSI & vbCrLf & _
-           "  Solo en v1        : " & cntSoloV1 & vbCrLf & _
-           "  Solo en v2        : " & cntSoloV2 & vbCrLf & _
-           "  Iguales           : " & cntIguales & vbCrLf & vbCrLf & _
-           "Filtra columna DIFERENTE = SI para ver cambios de campo.", _
+           "  DIFERENTES  : " & cntSI & vbCrLf & _
+           "  IGUALES     : " & cntIguales & vbCrLf & _
+           "  SOLO EN V1  : " & cntSoloV1 & vbCrLf & _
+           "  SOLO EN V2  : " & cntSoloV2 & vbCrLf & vbCrLf & _
+           "Filtra columna DIFERENTE para ver el resultado por fila.", _
            vbInformation, "Resultado"
 End Sub
