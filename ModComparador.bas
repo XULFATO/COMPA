@@ -1,6 +1,6 @@
 '===========================================================
-' COMPARADOR DE EXCELS
-' Pega TODO este bloque en un modulo nuevo del VBE (Alt+F11)
+' COMPARADOR DE EXCELS - pega este bloque en un modulo VBA
+' Alt+F11 -> Insertar -> Modulo -> borra lo que haya -> pega
 '===========================================================
 
 Sub ImportarHoy1()
@@ -11,15 +11,20 @@ Sub ImportarHoy2()
     ImportarHoja 2
 End Sub
 
+'-----------------------------------------------------------
 Sub ImportarHoja(slot As Integer)
 
-    Dim nombres()   As String
-    Dim wbLoop      As Workbook
-    Dim n           As Integer
-    Dim i           As Integer
+    ' Referencia a MENU capturada AL INICIO, antes de cualquier Copy
+    Dim wsMenu As Worksheet
+    Set wsMenu = ThisWorkbook.Worksheets("MENU")
 
     ' --- 1) Listar workbooks abiertos (excluir este) ---
+    Dim nombres()  As String
+    Dim wbLoop     As Workbook
+    Dim n          As Integer
+    Dim i          As Integer
     n = 0
+
     For Each wbLoop In Application.Workbooks
         If wbLoop.Name <> ThisWorkbook.Name Then
             ReDim Preserve nombres(n)
@@ -36,19 +41,17 @@ Sub ImportarHoja(slot As Integer)
     End If
 
     ' --- 2) Elegir fichero ---
-    Dim lista   As String
+    Dim lista As String
     lista = "Ficheros Excel abiertos:" & vbCrLf & vbCrLf
     For i = 0 To n - 1
         lista = lista & "  " & (i + 1) & "  ->  " & nombres(i) & vbCrLf
     Next i
     lista = lista & vbCrLf & "Escribe el numero del fichero:"
 
-    Dim respWB  As Variant
+    Dim respWB As Variant
     respWB = Application.InputBox(lista, "Importar HOY " & slot, Type:=1)
 
-    If VarType(respWB) = vbBoolean Then Exit Sub   ' Cancelo
-    If Not IsNumeric(respWB) Then MsgBox "Numero no valido.", vbExclamation: Exit Sub
-
+    If VarType(respWB) = vbBoolean Then Exit Sub
     Dim idxWB As Integer
     idxWB = CInt(respWB) - 1
     If idxWB < 0 Or idxWB >= n Then
@@ -77,8 +80,6 @@ Sub ImportarHoja(slot As Integer)
     respWS = Application.InputBox(listaH, "Importar HOY " & slot, Type:=1)
 
     If VarType(respWS) = vbBoolean Then Exit Sub
-    If Not IsNumeric(respWS) Then MsgBox "Numero no valido.", vbExclamation: Exit Sub
-
     Dim idxWS As Integer
     idxWS = CInt(respWS) - 1
     If idxWS < 0 Or idxWS >= m Then
@@ -114,20 +115,18 @@ Sub ImportarHoja(slot As Integer)
     On Error GoTo 0
     Application.DisplayAlerts = True
 
-    ' --- 6) Copiar hoja ---
+    ' --- 6) Copiar hoja al final de este workbook ---
     wsOrigen.Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
     ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count).Name = nomHoja
 
-    ' --- 7) Guardar referencia en MENU J1/J2 ---
-    Dim ws As Worksheet
-    Set ws = ThisWorkbook.Worksheets("MENU")
+    ' --- 7) Guardar referencia (wsMenu ya capturada al inicio) ---
     If slot = 1 Then
-        ws.Range("J1").Value = nomHoja
+        wsMenu.Range("J1").Value = nomHoja
     Else
-        ws.Range("J2").Value = nomHoja
+        wsMenu.Range("J2").Value = nomHoja
     End If
 
-    ws.Activate
+    wsMenu.Activate
     MsgBox "Hoja importada como:" & vbCrLf & vbCrLf & _
            "  << " & nomHoja & " >>", vbInformation, "HOY " & slot & " OK"
 End Sub
@@ -138,13 +137,14 @@ End Sub
 '===========================================================
 Sub CompararHojas()
 
-    Dim ws As Worksheet
-    Set ws = ThisWorkbook.Worksheets("MENU")
+    ' Referencia a MENU capturada AL INICIO
+    Dim wsMenu As Worksheet
+    Set wsMenu = ThisWorkbook.Worksheets("MENU")
 
     Dim nomH1 As String
     Dim nomH2 As String
-    nomH1 = Trim(ws.Range("J1").Value)
-    nomH2 = Trim(ws.Range("J2").Value)
+    nomH1 = Trim(wsMenu.Range("J1").Value)
+    nomH2 = Trim(wsMenu.Range("J2").Value)
 
     If nomH1 = "" Or nomH2 = "" Then
         MsgBox "Importa primero las dos hojas (HOY 1 y HOY 2).", _
@@ -154,7 +154,6 @@ Sub CompararHojas()
 
     Dim ws1 As Worksheet
     Dim ws2 As Worksheet
-
     On Error Resume Next
     Set ws1 = ThisWorkbook.Worksheets(nomH1)
     Set ws2 = ThisWorkbook.Worksheets(nomH2)
@@ -169,7 +168,7 @@ Sub CompararHojas()
         Exit Sub
     End If
 
-    ' --- Limites ---
+    ' --- Limites de datos ---
     Dim lastRow1 As Long, lastCol1 As Long
     Dim lastRow2 As Long, lastCol2 As Long
     lastRow1 = ws1.Cells(ws1.Rows.Count, 1).End(xlUp).Row
@@ -177,25 +176,28 @@ Sub CompararHojas()
     lastRow2 = ws2.Cells(ws2.Rows.Count, 1).End(xlUp).Row
     lastCol2 = ws2.Cells(1, ws2.Columns.Count).End(xlToLeft).Column
 
-    Dim maxRow As Long, maxCol As Long
+    Dim maxRow As Long
+    Dim maxCol As Long
     maxRow = Application.Max(lastRow1, lastRow2)
     maxCol = Application.Max(lastCol1, lastCol2)
 
-    ' --- Borrar COMPARACION anterior ---
+    ' --- Borrar COMPARACION anterior si existe ---
     Application.DisplayAlerts = False
     On Error Resume Next
     ThisWorkbook.Worksheets("COMPARACION").Delete
     On Error GoTo 0
     Application.DisplayAlerts = True
 
-    ' --- Crear hoja COMPARACION ---
+    ' --- Crear hoja COMPARACION al final ---
     Dim wsC As Worksheet
     Set wsC = ThisWorkbook.Worksheets.Add( _
         After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
     wsC.Name = "COMPARACION"
 
+    ' Copiar cabecera de ws1
     ws1.Rows(1).Copy wsC.Rows(1)
 
+    ' Columna DIFERENTE al final
     Dim colDif As Long
     colDif = maxCol + 1
     With wsC.Cells(1, colDif)
@@ -205,7 +207,7 @@ Sub CompararHojas()
         .Interior.Color = RGB(31, 78, 121)
     End With
 
-    ' --- Recorrer filas ---
+    ' --- Recorrer filas de datos ---
     Application.ScreenUpdating = False
 
     Dim fila    As Long
@@ -217,8 +219,8 @@ Sub CompararHojas()
     filaC = 2
 
     For fila = 2 To maxRow
-        difFila = False
 
+        difFila = False
         For col = 1 To maxCol
             v1 = ""
             v2 = ""
@@ -230,12 +232,14 @@ Sub CompararHojas()
             End If
         Next col
 
+        ' Copiar la fila (de ws1 si existe, si no de ws2)
         If fila <= lastRow1 Then
             ws1.Rows(fila).Copy wsC.Rows(filaC)
         Else
             ws2.Rows(fila).Copy wsC.Rows(filaC)
         End If
 
+        ' Marcar DIFERENTE y colorear celdas cambiadas
         If difFila Then
             wsC.Cells(filaC, colDif).Value = "SI"
             wsC.Cells(filaC, colDif).Font.Color = RGB(192, 57, 43)
@@ -259,7 +263,7 @@ Sub CompararHojas()
         filaC = filaC + 1
     Next fila
 
-    ' --- Formato cabecera y autofiltro ---
+    ' --- Formato final de COMPARACION ---
     With wsC.Rows(1)
         .Font.Bold = True
         .Interior.Color = RGB(31, 78, 121)
@@ -276,6 +280,7 @@ Sub CompararHojas()
 
     Application.ScreenUpdating = True
 
+    ' --- Resumen ---
     Dim totalDif As Long
     totalDif = Application.WorksheetFunction.CountIf(wsC.Columns(colDif), "SI")
 
