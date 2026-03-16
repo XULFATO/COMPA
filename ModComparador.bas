@@ -91,33 +91,9 @@ Sub ImportarHoja(slot As Integer)
     Dim wbOrigen As Workbook
     Set wbOrigen = Application.Workbooks(nombres(idxWB))
 
-    ' --- 3) Elegir hoja ---
-    Dim hojas() As String
-    Dim m       As Integer
-    m = wbOrigen.Worksheets.Count
-    ReDim hojas(m - 1)
-
-    Dim listaH As String
-    listaH = "Hojas de [" & wbOrigen.Name & "]:" & vbCrLf & vbCrLf
-    For i = 1 To m
-        hojas(i - 1) = wbOrigen.Worksheets(i).Name
-        listaH = listaH & "  " & i & "  ->  " & wbOrigen.Worksheets(i).Name & vbCrLf
-    Next i
-    listaH = listaH & vbCrLf & "Escribe el numero de la hoja:"
-
-    Dim respWS As Variant
-    respWS = Application.InputBox(listaH, "Importar HOY " & slot, Type:=1)
-    If VarType(respWS) = vbBoolean Then Exit Sub
-
-    Dim idxWS As Integer
-    idxWS = CInt(respWS) - 1
-    If idxWS < 0 Or idxWS >= m Then
-        MsgBox "Numero fuera de rango (1 a " & m & ").", vbExclamation
-        Exit Sub
-    End If
-
+    ' --- 3) Coger siempre la primera hoja (PAGE 1) ---
     Dim wsOrigen As Worksheet
-    Set wsOrigen = wbOrigen.Worksheets(hojas(idxWS))
+    Set wsOrigen = wbOrigen.Worksheets(1)
 
     ' --- 4) Nombre: nombre original + sufijo v1 o v2 ---
     Dim nomBase As String
@@ -446,17 +422,15 @@ Sub CompararHojas()
             Next col
 
         ElseIf estado = "SOLO EN V1" Or estado = "SOLO EN V2" Then
-            ' Fondo azul suave + tachado en toda la fila de datos
+            ' Fondo azul suave + tachado en datos, columna DIFERENTE vacia
             wsC.Rows(filaC).Interior.Color = RGB(213, 229, 242)
             With wsC.Range(wsC.Cells(filaC, 1), wsC.Cells(filaC, colDif - 1)).Font
                 .Strikethrough = True
                 .Color = RGB(80, 80, 80)
             End With
             With wsC.Cells(filaC, colDif)
-                .Value = estado
-                .Font.Bold = True
+                .Value = ""
                 .Font.Strikethrough = False
-                .Font.Color = RGB(31, 78, 121)
             End With
 
         Else
