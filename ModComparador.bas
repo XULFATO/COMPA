@@ -90,17 +90,15 @@ Sub ImportarHoja(slot As Integer)
     Dim wsOrigen As Worksheet
     Set wsOrigen = wbOrigen.Worksheets(hojas(idxWS))
 
-    ' --- 4) Construir nombre de hoja destino ---
+    ' --- 4) Nombre de hoja destino: igual que el original, con sufijo v1 o v2 ---
     Dim nomBase As String
-    nomBase = wbOrigen.Name
-    Dim p As Integer
-    p = InStrRev(nomBase, ".")
-    If p > 0 Then nomBase = Left(nomBase, p - 1)
-    If Len(nomBase) > 20 Then nomBase = Left(nomBase, 20)
+    nomBase = wsOrigen.Name
+    If Len(nomBase) > 25 Then nomBase = Left(nomBase, 25)
 
     Dim nomHoja As String
-    nomHoja = nomBase & " [HOY " & slot & "]"
+    nomHoja = nomBase & " v" & slot
 
+    ' Sanitizar caracteres ilegales en nombre de hoja
     Dim cars As Variant
     Dim c    As Variant
     cars = Array("/", "\", "?", "*", "[", "]", ":")
@@ -116,8 +114,13 @@ Sub ImportarHoja(slot As Integer)
     Application.DisplayAlerts = True
 
     ' --- 6) Copiar hoja al final de este workbook ---
-    wsOrigen.Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
-    ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count).Name = nomHoja
+    ' Guardar referencia al libro ANTES del Copy (el Copy puede cambiar el libro activo)
+    Dim wbThis As Workbook
+    Set wbThis = ThisWorkbook
+    Dim totalHojas As Integer
+    totalHojas = wbThis.Worksheets.Count
+    wsOrigen.Copy After:=wbThis.Worksheets(totalHojas)
+    wbThis.Worksheets(wbThis.Worksheets.Count).Name = nomHoja
 
     ' --- 7) Guardar referencia (wsMenu ya capturada al inicio) ---
     If slot = 1 Then
@@ -133,7 +136,7 @@ End Sub
 
 
 '===========================================================
-' COMPARAR
+' COMPARAR - formato doble columna v1/v2 por cada campo
 '===========================================================
 Sub CompararHojas()
 
@@ -194,91 +197,139 @@ Sub CompararHojas()
         After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
     wsC.Name = "COMPARACION"
 
-    ' Copiar cabecera de ws1
-    ws1.Rows(1).Copy wsC.Rows(1)
+    ' -------------------------------------------------------
+    ' CABECERA FILA 1: nombre del campo (fusionado v1+v2)
+    ' CABECERA FILA 2: etiquetas v1 / v2
+    ' Cada campo ocupa 2 columnas en la hoja resultado.
+    ' Columna DIFERENTE va al final (col 2*maxCol + 1)
+    ' -------------------------------------------------------
+    Dim col       As Long
+    Dim colC      As Long   ' columna destino en wsC (1-based)
+    Dim cabecera  As String
 
-    ' Columna DIFERENTE al final
+    For col = 1 To maxCol
+        colC = (col - 1) * 2 + 1   ' columna v1
+        ' Nombre del campo (de ws1 si existe, si no de ws2)
+        If col <= lastCol1 Then
+            cabecera = CStr(ws1.Cells(1, col).Value)
+        ElseIf col <= lastCol2 Then
+            cabecera = CStr(ws2.Cells(1, col).Value)
+        Else
+            cabecera = "Campo" & col
+        End If
+
+        ' Fila 1: cabecera fusionada (v1 y v2 juntas)
+        wsC.Range(wsC.Cells(1, colC), wsC.Cells(1, colC + 1)).Merge
+        wsC.Cells(1, colC).Value = cabecera
+
+        ' Fila 2: etiquetas v1 / v2
+        wsC.Cells(2, colC).Value = "v1"
+        wsC.Cells(2, colC + 1).Value = "v2"
+    Next col
+
+    ' Cabecera columna DIFERENTE
     Dim colDif As Long
-    colDif = maxCol + 1
-    With wsC.Cells(1, colDif)
-        .Value = "DIFERENTE"
+    colDif = maxCol * 2 + 1
+
+    wsC.Cells(1, colDif).Value = "DIFERENTE"
+    wsC.Cells(2, colDif).Value = ""
+
+    ' --- Formato cabeceras ---
+    ' Fila 1: azul oscuro
+    With wsC.Rows(1)
         .Font.Bold = True
         .Font.Color = RGB(255, 255, 255)
         .Interior.Color = RGB(31, 78, 121)
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+    End With
+    ' Fila 2: azul medio para v1/v2
+    With wsC.Rows(2)
+        .Font.Bold = True
+        .Font.Color = RGB(255, 255, 255)
+        .Interior.Color = RGB(41, 128, 185)
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+    End With
+    ' Columna DIFERENTE fila 2: mantener azul oscuro
+    With wsC.Cells(2, colDif)
+        .Interior.Color = RGB(31, 78, 121)
     End With
 
-    ' --- Recorrer filas de datos ---
+    ' --- Recorrer filas de datos (desde fila 2 del origen = fila 3 del resultado) ---
     Application.ScreenUpdating = False
 
     Dim fila    As Long
-    Dim col     As Long
     Dim v1      As String
     Dim v2      As String
     Dim difFila As Boolean
     Dim filaC   As Long
-    filaC = 2
+    filaC = 3
 
     For fila = 2 To maxRow
 
         difFila = False
+
+        ' Escribir valores v1 y v2 en cada par de columnas
         For col = 1 To maxCol
+            colC = (col - 1) * 2 + 1
             v1 = ""
             v2 = ""
             If col <= lastCol1 And fila <= lastRow1 Then v1 = CStr(ws1.Cells(fila, col).Value)
             If col <= lastCol2 And fila <= lastRow2 Then v2 = CStr(ws2.Cells(fila, col).Value)
-            If v1 <> v2 Then
-                difFila = True
-                Exit For
-            End If
+
+            wsC.Cells(filaC, colC).Value = v1
+            wsC.Cells(filaC, colC + 1).Value = v2
+
+            If v1 <> v2 Then difFila = True
         Next col
 
-        ' Copiar la fila (de ws1 si existe, si no de ws2)
-        If fila <= lastRow1 Then
-            ws1.Rows(fila).Copy wsC.Rows(filaC)
-        Else
-            ws2.Rows(fila).Copy wsC.Rows(filaC)
-        End If
-
-        ' Marcar DIFERENTE y colorear celdas cambiadas
+        ' Marcar fila y celdas diferentes
         If difFila Then
-            wsC.Cells(filaC, colDif).Value = "SI"
-            wsC.Cells(filaC, colDif).Font.Color = RGB(192, 57, 43)
-            wsC.Cells(filaC, colDif).Font.Bold = True
+            ' Fondo suave en toda la fila
             wsC.Rows(filaC).Interior.Color = RGB(255, 235, 235)
+
+            ' Columna DIFERENTE
+            With wsC.Cells(filaC, colDif)
+                .Value = "SI"
+                .Font.Bold = True
+                .Font.Color = RGB(192, 57, 43)
+            End With
+
+            ' Marcar en rojo oscuro solo las celdas v2 que difieren
             For col = 1 To maxCol
-                v1 = ""
-                v2 = ""
-                If col <= lastCol1 And fila <= lastRow1 Then v1 = CStr(ws1.Cells(fila, col).Value)
-                If col <= lastCol2 And fila <= lastRow2 Then v2 = CStr(ws2.Cells(fila, col).Value)
+                colC = (col - 1) * 2 + 1
+                v1 = CStr(wsC.Cells(filaC, colC).Value)
+                v2 = CStr(wsC.Cells(filaC, colC + 1).Value)
                 If v1 <> v2 Then
-                    wsC.Cells(filaC, col).Interior.Color = RGB(255, 180, 180)
-                    wsC.Cells(filaC, col).Font.Bold = True
+                    With wsC.Cells(filaC, colC + 1)
+                        .Interior.Color = RGB(139, 0, 0)
+                        .Font.Color = RGB(255, 255, 255)
+                        .Font.Bold = True
+                    End With
                 End If
             Next col
         Else
-            wsC.Cells(filaC, colDif).Value = "NO"
-            wsC.Cells(filaC, colDif).Font.Color = RGB(39, 174, 96)
+            With wsC.Cells(filaC, colDif)
+                .Value = "NO"
+                .Font.Color = RGB(39, 174, 96)
+            End With
         End If
 
         filaC = filaC + 1
     Next fila
 
-    ' --- Formato final de COMPARACION ---
-    With wsC.Rows(1)
-        .Font.Bold = True
-        .Interior.Color = RGB(31, 78, 121)
-        .Font.Color = RGB(255, 255, 255)
-    End With
-
-    wsC.Rows(1).AutoFilter
+    ' --- Autofiltro en fila 2 (v1/v2), congelar primeras 2 filas ---
+    ' Fila 1 tiene celdas fusionadas: el AutoFilter va en fila 2
+    wsC.Rows(2).AutoFilter
     wsC.Cells.EntireColumn.AutoFit
 
+    Application.ScreenUpdating = True
+
     wsC.Activate
-    wsC.Rows(2).Select
+    wsC.Rows(3).Select
     ActiveWindow.FreezePanes = True
     wsC.Range("A1").Select
-
-    Application.ScreenUpdating = True
 
     ' --- Resumen ---
     Dim totalDif As Long
