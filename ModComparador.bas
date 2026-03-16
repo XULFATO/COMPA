@@ -343,14 +343,22 @@ Sub CompararHojas()
     ' --- Escribir datos cruzados por Employee ID ---
     Application.ScreenUpdating = False
 
-    Dim filaC   As Long
-    Dim r1      As Long
-    Dim r2      As Long
-    Dim v1      As String
-    Dim v2      As String
-    Dim difFila As Boolean
-    Dim estado  As String
+    Dim filaC      As Long
+    Dim r1         As Long
+    Dim r2         As Long
+    Dim v1         As String
+    Dim v2         As String
+    Dim difFila    As Boolean
+    Dim estado     As String
+    Dim cntSI      As Long
+    Dim cntSoloV1  As Long
+    Dim cntSoloV2  As Long
+    Dim cntIguales As Long
     filaC = 3
+    cntSI      = 0
+    cntSoloV1  = 0
+    cntSoloV2  = 0
+    cntIguales = 0
 
     For k = 1 To nAll
         Dim empID As String
@@ -421,17 +429,21 @@ Sub CompararHojas()
                 End If
             Next col
 
-        ElseIf estado = "SOLO EN V1" Or estado = "SOLO EN V2" Then
-            ' Fondo azul suave + tachado en datos, columna DIFERENTE vacia
+        ElseIf estado = "SOLO EN V1" Then
+            ' Solo en V1 (ha desaparecido): fondo azul suave + tachado
             wsC.Rows(filaC).Interior.Color = RGB(213, 229, 242)
             With wsC.Range(wsC.Cells(filaC, 1), wsC.Cells(filaC, colDif - 1)).Font
                 .Strikethrough = True
                 .Color = RGB(80, 80, 80)
             End With
-            With wsC.Cells(filaC, colDif)
-                .Value = ""
-                .Font.Strikethrough = False
-            End With
+            wsC.Cells(filaC, colDif).Value = ""
+            wsC.Cells(filaC, colDif).Font.Strikethrough = False
+
+        ElseIf estado = "SOLO EN V2" Then
+            ' Solo en V2 (alta nueva): fondo verde suave, sin tachado
+            wsC.Rows(filaC).Interior.Color = RGB(198, 239, 206)
+            wsC.Cells(filaC, colDif).Value = ""
+            wsC.Cells(filaC, colDif).Font.Strikethrough = False
 
         Else
             ' Igual: fondo blanco, verde en DIFERENTE
@@ -439,6 +451,17 @@ Sub CompararHojas()
                 .Value = "NO"
                 .Font.Color = RGB(39, 174, 96)
             End With
+        End If
+
+        ' Acumular contadores
+        If estado = "SI" Then
+            cntSI = cntSI + 1
+        ElseIf estado = "SOLO EN V1" Then
+            cntSoloV1 = cntSoloV1 + 1
+        ElseIf estado = "SOLO EN V2" Then
+            cntSoloV2 = cntSoloV2 + 1
+        Else
+            cntIguales = cntIguales + 1
         End If
 
         filaC = filaC + 1
@@ -484,19 +507,12 @@ Sub CompararHojas()
     wsC.Range("A1").Select
 
     ' --- Resumen ---
-    Dim totalSI     As Long
-    Dim totalSoloV1 As Long
-    Dim totalSoloV2 As Long
-    totalSI     = Application.WorksheetFunction.CountIf(wsC.Columns(colDif), "SI")
-    totalSoloV1 = Application.WorksheetFunction.CountIf(wsC.Columns(colDif), "SOLO EN V1")
-    totalSoloV2 = Application.WorksheetFunction.CountIf(wsC.Columns(colDif), "SOLO EN V2")
-
     MsgBox "Comparacion completada." & vbCrLf & vbCrLf & _
            "  Registros totales : " & nAll & vbCrLf & _
-           "  Campos diferentes : " & totalSI & vbCrLf & _
-           "  Solo en v1        : " & totalSoloV1 & vbCrLf & _
-           "  Solo en v2        : " & totalSoloV2 & vbCrLf & _
-           "  Iguales           : " & (nAll - totalSI - totalSoloV1 - totalSoloV2) & vbCrLf & vbCrLf & _
-           "Filtra columna DIFERENTE para ver los cambios.", _
+           "  Campos diferentes : " & cntSI & vbCrLf & _
+           "  Solo en v1        : " & cntSoloV1 & vbCrLf & _
+           "  Solo en v2        : " & cntSoloV2 & vbCrLf & _
+           "  Iguales           : " & cntIguales & vbCrLf & vbCrLf & _
+           "Filtra columna DIFERENTE = SI para ver cambios de campo.", _
            vbInformation, "Resultado"
 End Sub
