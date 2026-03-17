@@ -1,9 +1,12 @@
-Private Sub Workbook_Open()
+' ============================================================
+' CREAR BOTONES EN EL MENU
+' Modulo independiente. Ejecutar una sola vez.
+' ============================================================
+Sub CrearBotonesMenu()
 
-
-
- Dim ws As Worksheet
+    Dim ws As Worksheet
     Set ws = ThisWorkbook.Worksheets("MENU")
+    ws.Unprotect Password:="ADP"
 
     ' Limpia lo que hubiera antes
     Dim shp As Shape
@@ -14,12 +17,12 @@ Private Sub Workbook_Open()
     Application.ScreenUpdating = False
 
     ' Medidas
-    Dim btnH  As Double: btnH = 32
-    Dim btnW  As Double: btnW = 150
-    Dim lblH  As Double: lblH = 18
-    Dim sep   As Double: sep = 16      ' separacion horizontal entre botones
+    Dim btnH  As Double: btnH  = 32
+    Dim btnW  As Double: btnW  = 150
+    Dim lblH  As Double: lblH  = 18
+    Dim sep   As Double: sep   = 16    ' separacion horizontal entre botones
     Dim leftX As Double: leftX = 30
-    Dim topY  As Double: topY = 30
+    Dim topY  As Double: topY  = 30
 
     ' ----------------------------------------------------------
     ' Labels de paso (sin color, texto gris oscuro)
@@ -116,7 +119,7 @@ Private Sub Workbook_Open()
     ' Boton borrar: mismo ancho que los 3 botones juntos, mas abajo
     ' ----------------------------------------------------------
     Dim anchoTotal As Double: anchoTotal = btnW * 3 + sep * 2
-    Dim topBorrar  As Double: topBorrar = btnTop + btnH + 50
+    Dim topBorrar  As Double: topBorrar  = btnTop + btnH + 50
 
     Dim b4 As Shape
     Set b4 = ws.Shapes.AddShape(msoShapeRoundedRectangle, leftB1, topBorrar, anchoTotal, 24)
@@ -134,10 +137,7 @@ Private Sub Workbook_Open()
     ws.Tab.Color = RGB(31, 78, 121)
 
     Application.ScreenUpdating = True
+    ws.Protect Password:="ADP", DrawingObjects:=False, Contents:=True, Scenarios:=True
     MsgBox "Botones creados.", vbInformation, "Listo"
-
-
-
-
 
 End Sub
