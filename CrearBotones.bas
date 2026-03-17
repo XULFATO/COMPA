@@ -1,10 +1,8 @@
-' ============================================================
-' CREAR BOTONES EN EL MENU
-' Modulo independiente. Ejecutar una sola vez.
-' ============================================================
-Sub CrearBotonesMenu()
+Private Sub Workbook_Open()
 
-    Dim ws As Worksheet
+
+
+ Dim ws As Worksheet
     Set ws = ThisWorkbook.Worksheets("MENU")
 
     ' Limpia lo que hubiera antes
@@ -16,29 +14,12 @@ Sub CrearBotonesMenu()
     Application.ScreenUpdating = False
 
     ' Medidas
-    Dim btnH  As Double: btnH  = 32
-    Dim btnW  As Double: btnW  = 150
-    Dim lblH  As Double: lblH  = 14
-    Dim sep   As Double: sep   = 16    ' separacion horizontal entre botones
+    Dim btnH  As Double: btnH = 32
+    Dim btnW  As Double: btnW = 150
+    Dim lblH  As Double: lblH = 18
+    Dim sep   As Double: sep = 16      ' separacion horizontal entre botones
     Dim leftX As Double: leftX = 30
-    Dim topY  As Double: topY  = 60
-
-    ' ----------------------------------------------------------
-    ' Titulo
-    ' ----------------------------------------------------------
-    Dim tit As Shape
-    Set tit = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, _
-        leftX, 14, (btnW * 3 + sep * 2), 30)
-    With tit.TextFrame2
-        .TextRange.Text = "COMPARADOR DE EXCELS"
-        .TextRange.Font.Size = 13
-        .TextRange.Font.Bold = msoTrue
-        .TextRange.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
-        .TextRange.ParagraphFormat.Alignment = msoAlignCenter
-        .VerticalAnchor = msoAnchorMiddle
-    End With
-    With tit.Fill: .Solid: .ForeColor.RGB = RGB(31, 78, 121): End With
-    tit.Line.Visible = msoFalse
+    Dim topY  As Double: topY = 30
 
     ' ----------------------------------------------------------
     ' Labels de paso (sin color, texto gris oscuro)
@@ -53,7 +34,7 @@ Sub CrearBotonesMenu()
     Set l1 = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, leftB1, topY, btnW, lblH)
     With l1.TextFrame2
         .TextRange.Text = "Paso 1  |  Bulk antiguo"
-        .TextRange.Font.Size = 7
+        .TextRange.Font.Size = 10
         .TextRange.Font.Fill.ForeColor.RGB = RGB(90, 90, 90)
     End With
     l1.Fill.Visible = msoFalse
@@ -64,7 +45,7 @@ Sub CrearBotonesMenu()
     Set l2 = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, leftB2, topY, btnW, lblH)
     With l2.TextFrame2
         .TextRange.Text = "Paso 2  |  Bulk actual"
-        .TextRange.Font.Size = 7
+        .TextRange.Font.Size = 10
         .TextRange.Font.Fill.ForeColor.RGB = RGB(90, 90, 90)
     End With
     l2.Fill.Visible = msoFalse
@@ -75,7 +56,7 @@ Sub CrearBotonesMenu()
     Set l3 = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, leftB3, topY, btnW, lblH)
     With l3.TextFrame2
         .TextRange.Text = "Paso 3  |  Comparar"
-        .TextRange.Font.Size = 7
+        .TextRange.Font.Size = 10
         .TextRange.Font.Fill.ForeColor.RGB = RGB(90, 90, 90)
     End With
     l3.Fill.Visible = msoFalse
@@ -132,12 +113,13 @@ Sub CrearBotonesMenu()
     b3.OnAction = "CompararHojas"
 
     ' ----------------------------------------------------------
-    ' Boton borrar debajo, mas discreto
+    ' Boton borrar: mismo ancho que los 3 botones juntos, mas abajo
     ' ----------------------------------------------------------
-    Dim topBorrar As Double: topBorrar = btnTop + btnH + 20
+    Dim anchoTotal As Double: anchoTotal = btnW * 3 + sep * 2
+    Dim topBorrar  As Double: topBorrar = btnTop + btnH + 50
 
     Dim b4 As Shape
-    Set b4 = ws.Shapes.AddShape(msoShapeRoundedRectangle, leftB1, topBorrar, btnW * 2, 24)
+    Set b4 = ws.Shapes.AddShape(msoShapeRoundedRectangle, leftB1, topBorrar, anchoTotal, 24)
     With b4.TextFrame2
         .TextRange.Text = "Borrar todas las hojas menos MENU"
         .TextRange.Font.Size = 8
@@ -153,5 +135,9 @@ Sub CrearBotonesMenu()
 
     Application.ScreenUpdating = True
     MsgBox "Botones creados.", vbInformation, "Listo"
+
+
+
+
 
 End Sub
