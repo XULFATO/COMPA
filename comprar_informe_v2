@@ -1,22 +1,15 @@
 ' ============================================================
-' COMPARADOR DEFINITIVO - AUDITORÍA TÉCNICA PASADA
+' COMPARADOR EXCEL - VERSIÓN "ESPEJO V1" (AUDITADA)
 ' ============================================================
 
-' --- MACROS PARA BOTONES ---
-Sub Boton_Importar1(): ImportarHoja 1: End Sub
-Sub Boton_Importar2(): ImportarHoja 2: End Sub
-Sub Boton_Comparar(): CompararHojas: End Sub
-Sub Boton_Exportar(): ExportarDiferenciasV2: End Sub
-Sub Boton_Limpiar(): BorrarTodo: End Sub
+Sub ImportarHoy1(): ImportarHoja 1: End Sub
+Sub ImportarHoy2(): ImportarHoja 2: End Sub
 
-' ============================================================
-' 1. LIMPIEZA DE ENTORNO
-' ============================================================
+' 1. LIMPIEZA TOTAL
 Sub BorrarTodo()
     Dim resp As Integer
-    resp = MsgBox("¿Limpiar todas las hojas y datos?", vbQuestion + vbYesNo, "Reset")
+    resp = MsgBox("¿Eliminar todas las hojas de datos?", vbQuestion + vbYesNo, "Limpieza")
     If resp = vbNo Then Exit Sub
-
     Application.DisplayAlerts = False
     Dim ws As Worksheet
     For Each ws In ThisWorkbook.Worksheets
@@ -24,63 +17,44 @@ Sub BorrarTodo()
     Next ws
     ThisWorkbook.Worksheets("MENU").Range("J1:J2").ClearContents
     Application.DisplayAlerts = True
-    MsgBox "Libro reseteado con formato General.", vbInformation
 End Sub
 
-' ============================================================
-' 2. IMPORTACIÓN (Tratamiento General de Origen)
-' ============================================================
+' 2. IMPORTACIÓN CON FORMATO GENERAL
 Sub ImportarHoja(slot As Integer)
-    Dim wsMenu As Worksheet: Set wsMenu = ThisWorkbook.Worksheets("MENU")
+    Dim wsM As Worksheet: Set wsM = ThisWorkbook.Worksheets("MENU")
     Dim wbLoop As Workbook, nombres() As String, n As Integer: n = 0
-    
     For Each wbLoop In Application.Workbooks
         If wbLoop.Name <> ThisWorkbook.Name Then
             ReDim Preserve nombres(n): nombres(n) = wbLoop.Name: n = n + 1
         End If
     Next wbLoop
-    
-    If n = 0 Then MsgBox "Abre el Excel a importar.", vbExclamation: Exit Sub
-    
-    Dim lista As String: lista = "Selecciona archivo para v" & slot & ":" & vbCrLf
-    For i = 0 To n - 1: lista = lista & (i + 1) & " -> " & nombres(i) & vbCrLf: Next i
-    
-    Dim resp As Variant: resp = Application.InputBox(lista, "Importar", Type:=1)
+    If n = 0 Then MsgBox "Abre el archivo primero.", vbExclamation: Exit Sub
+    Dim resp As Variant: resp = Application.InputBox("Selecciona archivo (1-" & n & "):", "Importar", Type:=1)
     If VarType(resp) = vbBoolean Then Exit Sub
-    
     Dim wbO As Workbook: Set wbO = Application.Workbooks(nombres(CInt(resp) - 1))
     Dim nomH As String: nomH = "Hoja_v" & slot
-    
     Application.DisplayAlerts = False
     On Error Resume Next: ThisWorkbook.Worksheets(nomH).Delete: On Error GoTo 0
-    
     wbO.Worksheets(1).Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
     With ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
         .Name = nomH
-        ' --- REGLA: TODO GENERAL ---
-        .Cells.NumberFormat = "General"
-        .Cells.EntireColumn.AutoFit
+        .Cells.NumberFormat = "General" ' <--- Obligar Formato General
     End With
-    
-    If slot = 1 Then wsMenu.Range("J1").Value = nomH Else wsMenu.Range("J2").Value = nomH
-    wsMenu.Activate
-    Application.DisplayAlerts = True
+    If slot = 1 Then wsM.Range("J1").Value = nomH Else wsM.Range("J2").Value = nomH
+    wsM.Activate: Application.DisplayAlerts = True
 End Sub
 
-' ============================================================
-' 3. COMPARACIÓN (Cruce por ID + Formatos V1)
-' ============================================================
+' 3. COMPARAR (ESTRUCTURA IDÉNTICA A V1)
 Sub CompararHojas()
     Dim wsM As Worksheet: Set wsM = ThisWorkbook.Worksheets("MENU")
     Dim nH1 As String: nH1 = Trim(wsM.Range("J1").Value)
     Dim nH2 As String: nH2 = Trim(wsM.Range("J2").Value)
-    
-    If nH1 = "" Or nH2 = "" Then MsgBox "Importa primero las dos versiones.", vbCritical: Exit Sub
+    If nH1 = "" Or nH2 = "" Then MsgBox "Importa ambas versiones.", vbCritical: Exit Sub
     
     Dim ws1 As Worksheet: Set ws1 = ThisWorkbook.Worksheets(nH1)
     Dim ws2 As Worksheet: Set ws2 = ThisWorkbook.Worksheets(nH2)
     
-    ' Localizar columna ID
+    ' Identificar columna ID
     Dim colID1 As Long, colID2 As Long, c As Long
     For c = 1 To ws1.Cells(1, 255).End(xlToLeft).Column
         If LCase(Trim(ws1.Cells(1, c))) = "* employee id" Then colID1 = c: Exit For
@@ -88,7 +62,6 @@ Sub CompararHojas()
     For c = 1 To ws2.Cells(1, 255).End(xlToLeft).Column
         If LCase(Trim(ws2.Cells(1, c))) = "* employee id" Then colID2 = c: Exit For
     Next
-    
     If colID1 = 0 Or colID2 = 0 Then MsgBox "No se encontró '* Employee ID'.", vbCritical: Exit Sub
 
     ' Crear COMPARACION
@@ -99,105 +72,74 @@ Sub CompararHojas()
     wsC.Name = "COMPARACION"
     wsC.Cells.NumberFormat = "General"
 
-    ' Cabeceras V1
-    Dim maxCol As Long: maxCol = Application.Max(ws1.Cells(1, 255).End(xlToLeft).Column, ws2.Cells(1, 255).End(xlToLeft).Column)
+    ' Cabeceras: Réplica exacta de V1
+    Dim lastCol1 As Long: lastCol1 = ws1.Cells(1, 255).End(xlToLeft).Column
     wsC.Cells(1, 1) = "FILTRO": wsC.Range("A1:A2").Merge
     wsC.Cells(1, 1).Interior.Color = RGB(197, 90, 17)
     
-    For c = 1 To maxCol
+    For c = 1 To lastCol1
         Dim colD As Long: colD = (c - 1) * 2 + 2
         wsC.Range(wsC.Cells(1, colD), wsC.Cells(1, colD + 1)).Merge
-        wsC.Cells(1, colD) = IIf(c <= ws1.Columns.Count, ws1.Cells(1, c).Value, "Campo " & c)
-        wsC.Cells(2, colD) = "BULK ANTERIOR": wsC.Cells(2, colD + 1) = "BULK ACTUAL"
+        wsC.Cells(1, colD) = ws1.Cells(1, c).Value ' Nombre exacto de la V1
+        wsC.Cells(2, colD) = "BULK ANTERIOR"
+        wsC.Cells(2, colD + 1) = "BULK ACTUAL"
     Next
     With wsC.Rows("1:2"): .Font.Bold = True: .Font.Color = vbWhite: .Interior.Color = RGB(31, 78, 121): .HorizontalAlignment = xlCenter: End With
 
-    ' --- BUCLE TÉCNICO DE COMPARACIÓN ---
+    ' COMPARACIÓN
     Dim lr2 As Long: lr2 = ws2.Cells(Rows.Count, colID2).End(xlUp).Row
-    Dim fD As Long: fD = 3
-    Dim id As String, r1 As Variant
+    Dim fD As Long: fD = 3: Dim r1 As Variant, id As String
     
     For r2 = 2 To lr2
         id = Trim(CStr(ws2.Cells(r2, colID2).Value))
         If id <> "" Then
             r1 = Application.Match(id, ws1.Columns(colID1), 0)
-            
             If IsError(r1) Then
-                ' NUEVO (Verde V1)
-                wsC.Cells(fD, 1).Value = "SOLO EN V2"
-                wsC.Cells(fD, 1).Interior.Color = RGB(21, 101, 71)
-                wsC.Range(wsC.Cells(fD, 2), wsC.Cells(fD, maxCol * 2 + 1)).Interior.Color = RGB(198, 239, 206)
-                For c = 1 To maxCol: wsC.Cells(fD, (c - 1) * 2 + 3).Value = ws2.Cells(r2, c).Value: Next
+                wsC.Cells(fD, 1).Value = "SOLO EN V2": wsC.Cells(fD, 1).Interior.Color = RGB(21, 101, 71)
+                wsC.Range(wsC.Cells(fD, 2), wsC.Cells(fD, lastCol1 * 2 + 1)).Interior.Color = RGB(198, 239, 206)
+                ' Si es nuevo, buscamos los campos en ws2 que coincidan por nombre con ws1
+                For c = 1 To lastCol1
+                    Dim colOrig2 As Variant: colOrig2 = Application.Match(ws1.Cells(1, c).Value, ws2.Rows(1), 0)
+                    If Not IsError(colOrig2) Then wsC.Cells(fD, (c - 1) * 2 + 3).Value = ws2.Cells(r2, colOrig2).Value
+                Next
             Else
-                ' COMPARAR (Rojo V1 si hay cambios)
                 Dim dif As Boolean: dif = False
-                For c = 1 To maxCol
+                For c = 1 To lastCol1
                     Dim v1 As String: v1 = Trim(CStr(ws1.Cells(r1, c).Value))
-                    Dim v2 As String: v2 = Trim(CStr(ws2.Cells(r2, c).Value))
-                    Dim colIdx As Long: colIdx = (c - 1) * 2 + 2
-                    wsC.Cells(fD, colIdx).Value = v1
-                    wsC.Cells(fD, colIdx + 1).Value = v2
+                    ' Buscar el mismo nombre de columna en ws2 por si varió el orden
+                    Dim colEnV2 As Variant: colEnV2 = Application.Match(ws1.Cells(1, c).Value, ws2.Rows(1), 0)
+                    Dim v2 As String: If Not IsError(colEnV2) Then v2 = Trim(CStr(ws2.Cells(r2, colEnV2).Value)) Else v2 = ""
+                    
+                    Dim cIdx As Long: cIdx = (c - 1) * 2 + 2
+                    wsC.Cells(fD, cIdx).Value = v1: wsC.Cells(fD, cIdx + 1).Value = v2
                     If v1 <> v2 Then
                         dif = True
-                        wsC.Cells(fD, colIdx).Interior.Color = RGB(255, 199, 199)
-                        wsC.Cells(fD, colIdx + 1).Interior.Color = RGB(139, 0, 0)
-                        wsC.Cells(fD, colIdx + 1).Font.Color = vbWhite
+                        wsC.Cells(fD, cIdx).Interior.Color = RGB(255, 199, 199)
+                        wsC.Cells(fD, cIdx + 1).Interior.Color = RGB(139, 0, 0): wsC.Cells(fD, cIdx + 1).Font.Color = vbWhite
                     End If
                 Next
-                If dif Then
-                    wsC.Cells(fD, 1).Value = "DIFERENTES"
-                    wsC.Cells(fD, 1).Interior.Color = RGB(192, 57, 43)
-                Else
-                    wsC.Cells(fD, 1).Value = "IGUALES"
-                    wsC.Cells(fD, 1).Interior.Color = RGB(39, 120, 56)
-                End If
+                wsC.Cells(fD, 1).Value = IIf(dif, "DIFERENTES", "IGUALES")
+                wsC.Cells(fD, 1).Interior.Color = IIf(dif, RGB(192, 57, 43), RGB(39, 120, 56))
             End If
             fD = fD + 1
         End If
     Next
-
-    wsC.Columns.AutoFit
-    wsC.Activate: wsC.Range("B3").Select: ActiveWindow.FreezePanes = True
-    Application.ScreenUpdating = True
-    MsgBox "Proceso completado.", vbInformation
+    wsC.Columns.AutoFit: wsC.Activate: wsC.Range("B3").Select: ActiveWindow.FreezePanes = True
+    Application.ScreenUpdating = True: MsgBox "Cruce finalizado estilo V1.", vbInformation
 End Sub
 
-' ============================================================
-' 4. EXPORTACIÓN (Libro Nuevo + Solo Diferencias)
-' ============================================================
+' 4. EXPORTAR SOLO DIFERENCIAS A LIBRO NUEVO
 Sub ExportarDiferenciasV2()
     Dim wsC As Worksheet: On Error Resume Next: Set wsC = ThisWorkbook.Worksheets("COMPARACION"): On Error GoTo 0
-    If wsC Is Nothing Then MsgBox "No hay comparación generada.", vbExclamation: Exit Sub
-
+    If wsC Is Nothing Then MsgBox "Compara primero.", vbExclamation: Exit Sub
     Application.ScreenUpdating = False
-    Dim wbN As Workbook: Set wbN = Workbooks.Add
-    Dim wsN As Worksheet: Set wsN = wbN.Sheets(1)
-    
-    ' Copiar cabeceras
-    wsC.Rows("1:2").Copy wsN.Rows(1)
-    
-    ' Filtrar y copiar
+    Dim wbN As Workbook: Set wbN = Workbooks.Add: Dim wsN As Worksheet: Set wsN = wbN.Sheets(1)
+    wsC.Rows("1:2").Copy: wsN.Range("A1").PasteSpecial xlPasteAll
     Dim i As Long, dest As Long: dest = 3
     For i = 3 To wsC.Cells(Rows.Count, 1).End(xlUp).Row
-        If wsC.Cells(i, 1).Value = "DIFERENTES" Then
-            wsC.Rows(i).Copy wsN.Rows(dest)
-            dest = dest + 1
-        End If
+        If wsC.Cells(i, 1).Value = "DIFERENTES" Then wsC.Rows(i).Copy wsN.Rows(dest): dest = dest + 1
     Next
-    
-    If dest = 3 Then
-        wbN.Close False
-        MsgBox "No se encontraron filas con 'DIFERENTES'.", vbInformation
-        Exit Sub
-    End If
-
-    ' Finalizar formato en libro nuevo
-    With wsN
-        .Name = "Diferencias"
-        .Cells.NumberFormat = "General"
-        .Columns.AutoFit
-    End With
-    
-    Application.ScreenUpdating = True
-    MsgBox "Exportación finalizada en nuevo archivo.", vbInformation
+    If dest = 3 Then wbN.Close False: MsgBox "Sin diferencias.": Exit Sub
+    wsN.Name = "Diferencias": wsN.Cells.NumberFormat = "General": wsN.Columns.AutoFit
+    Application.ScreenUpdating = True: MsgBox "Exportado.", vbInformation
 End Sub
