@@ -1,19 +1,15 @@
 ' ============================================================
-' COMPARADOR MAESTRO V3 - REPASADO Y BLINDADO
+' COMPARADOR DEFINITIVO V4.2 - REPASO FINAL Y CIERRE
 ' ============================================================
 
-' --- BOTONES DE CONTROL ---
+' --- BOTONES ---
 Sub ImportarHoy1(): ImportarHoja 1: End Sub
 Sub ImportarHoy2(): ImportarHoja 2: End Sub
 
-' 1. LIMPIEZA TOTAL (Reset de entorno)
+' 1. LIMPIEZA
 Sub BorrarTodo()
-    Dim resp As Integer
-    resp = MsgBox("¿Desea limpiar el libro por completo?", vbQuestion + vbYesNo, "Limpieza de Seguridad")
-    If resp = vbNo Then Exit Sub
-    
-    Application.DisplayAlerts = False
     Dim ws As Worksheet
+    Application.DisplayAlerts = False
     For Each ws In ThisWorkbook.Worksheets
         If ws.Name <> "MENU" Then ws.Delete
     Next ws
@@ -21,53 +17,41 @@ Sub BorrarTodo()
     Application.DisplayAlerts = True
 End Sub
 
-' 2. IMPORTACIÓN (Tratamiento de Texto desde el Origen)
+' 2. IMPORTACIÓN (Blindaje de ceros iniciales)
 Sub ImportarHoja(slot As Integer)
     Dim wsM As Worksheet: Set wsM = ThisWorkbook.Worksheets("MENU")
     Dim wbLoop As Workbook, nombres() As String, n As Integer: n = 0
-    
     For Each wbLoop In Application.Workbooks
         If wbLoop.Name <> ThisWorkbook.Name Then
             ReDim Preserve nombres(n): nombres(n) = wbLoop.Name: n = n + 1
         End If
     Next wbLoop
-    
-    If n = 0 Then MsgBox "No hay archivos abiertos para importar.", vbExclamation: Exit Sub
-    
-    Dim resp As Variant: resp = Application.InputBox("Seleccione archivo (1-" & n & "):", "Slot " & slot, Type:=1)
+    If n = 0 Then MsgBox "No hay otros archivos abiertos.", vbExclamation: Exit Sub
+    Dim resp As Variant: resp = Application.InputBox("Seleccione archivo:", "Importar", Type:=1)
     If VarType(resp) = vbBoolean Then Exit Sub
-    
     Dim wbO As Workbook: Set wbO = Application.Workbooks(nombres(CInt(resp) - 1))
     Dim nomH As String: nomH = "Hoja_v" & slot
-    
     Application.DisplayAlerts = False
     On Error Resume Next: ThisWorkbook.Worksheets(nomH).Delete: On Error GoTo 0
-    
-    ' Copiamos la hoja original
     wbO.Worksheets(1).Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
-    
     With ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
         .Name = nomH
-        ' --- CRÍTICO: Forzamos formato Texto para no perder 00001 ---
-        .Cells.NumberFormat = "@" 
+        .Cells.NumberFormat = "@" ' Formato Texto para mantener 00001
     End With
-    
     If slot = 1 Then wsM.Range("J1").Value = nomH Else wsM.Range("J2").Value = nomH
     wsM.Activate: Application.DisplayAlerts = True
 End Sub
 
-' 3. COMPARAR (Lógica Espejo V1 + Auditoría de IDs)
+' 3. COMPARAR (Espejo V1 y Lectura Visual)
 Sub CompararHojas()
     Dim wsM As Worksheet: Set wsM = ThisWorkbook.Worksheets("MENU")
     Dim nH1 As String: nH1 = Trim(wsM.Range("J1").Value)
     Dim nH2 As String: nH2 = Trim(wsM.Range("J2").Value)
-    
-    If nH1 = "" Or nH2 = "" Then MsgBox "Faltan hojas por importar.", vbCritical: Exit Sub
+    If nH1 = "" Or nH2 = "" Then MsgBox "Importa ambas hojas primero.", vbCritical: Exit Sub
     
     Dim ws1 As Worksheet: Set ws1 = ThisWorkbook.Worksheets(nH1)
     Dim ws2 As Worksheet: Set ws2 = ThisWorkbook.Worksheets(nH2)
     
-    ' Identificar columna ID mediante búsqueda visual exacta
     Dim colID1 As Long, colID2 As Long, c As Long
     For c = 1 To ws1.Cells(1, 255).End(xlToLeft).Column
         If LCase(Trim(ws1.Cells(1, c).Text)) = "* employee id" Then colID1 = c: Exit For
@@ -75,17 +59,14 @@ Sub CompararHojas()
     For c = 1 To ws2.Cells(1, 255).End(xlToLeft).Column
         If LCase(Trim(ws2.Cells(1, c).Text)) = "* employee id" Then colID2 = c: Exit For
     Next
-    
-    If colID1 = 0 Or colID2 = 0 Then MsgBox "Error: Columna '* Employee ID' no encontrada.", vbCritical: Exit Sub
+    If colID1 = 0 Or colID2 = 0 Then MsgBox "No se encontró '* Employee ID'.", vbCritical: Exit Sub
 
-    ' Crear COMPARACION
     Application.ScreenUpdating = False
     On Error Resume Next: ThisWorkbook.Worksheets("COMPARACION").Delete: On Error GoTo 0
     Dim wsC As Worksheet: Set wsC = ThisWorkbook.Worksheets.Add(After:=wsM)
     wsC.Name = "COMPARACION"
-    wsC.Cells.NumberFormat = "@" ' Bloqueo de formato Texto
+    wsC.Cells.NumberFormat = "@"
 
-    ' Cabeceras idénticas a V1
     Dim lastCol1 As Long: lastCol1 = ws1.Cells(1, 255).End(xlToLeft).Column
     wsC.Cells(1, 1) = "FILTRO": wsC.Range("A1:A2").Merge
     wsC.Cells(1, 1).Interior.Color = RGB(197, 90, 17)
@@ -94,22 +75,18 @@ Sub CompararHojas()
         Dim colD As Long: colD = (c - 1) * 2 + 2
         wsC.Range(wsC.Cells(1, colD), wsC.Cells(1, colD + 1)).Merge
         wsC.Cells(1, colD) = ws1.Cells(1, c).Text 
-        wsC.Cells(2, colD) = "BULK ANTERIOR"
-        wsC.Cells(2, colD + 1) = "BULK ACTUAL"
+        wsC.Cells(2, colD) = "ANTERIOR": wsC.Cells(2, colD + 1) = "ACTUAL"
     Next
     With wsC.Rows("1:2"): .Font.Bold = True: .Font.Color = vbWhite: .Interior.Color = RGB(31, 78, 121): .HorizontalAlignment = xlCenter: End With
 
-    ' --- PROCESO DE CRUCE DE DATOS ---
     Dim lr2 As Long: lr2 = ws2.Cells(Rows.Count, colID2).End(xlUp).Row
     Dim fD As Long: fD = 3: Dim r1 As Variant, id As String
     
     For r2 = 2 To lr2
-        id = Trim(ws2.Cells(r2, colID2).Text) ' Uso de .Text para capturar ceros
+        id = Trim(ws2.Cells(r2, colID2).Text)
         If id <> "" Then
             r1 = Application.Match(id, ws1.Columns(colID1), 0)
-            
             If IsError(r1) Then
-                ' CASO: NUEVO REGISTRO
                 wsC.Cells(fD, 1).Value = "SOLO EN V2": wsC.Cells(fD, 1).Interior.Color = RGB(21, 101, 71)
                 wsC.Range(wsC.Cells(fD, 2), wsC.Cells(fD, lastCol1 * 2 + 1)).Interior.Color = RGB(198, 239, 206)
                 For c = 1 To lastCol1
@@ -117,19 +94,16 @@ Sub CompararHojas()
                     If Not IsError(colOrig2) Then wsC.Cells(fD, (c - 1) * 2 + 3).Value = ws2.Cells(r2, colOrig2).Text
                 Next
             Else
-                ' CASO: COMPARAR CAMPOS
                 Dim dif As Boolean: dif = False
                 For c = 1 To lastCol1
                     Dim v1 As String: v1 = ws1.Cells(r1, c).Text
                     Dim colV2 As Variant: colV2 = Application.Match(ws1.Cells(1, c).Text, ws2.Rows(1), 0)
                     Dim v2 As String: If Not IsError(colV2) Then v2 = ws2.Cells(r2, colV2).Text Else v2 = ""
-                    
                     Dim cIdx As Long: cIdx = (c - 1) * 2 + 2
                     wsC.Cells(fD, cIdx).Value = v1: wsC.Cells(fD, cIdx + 1).Value = v2
-                    
                     If v1 <> v2 Then
                         dif = True
-                        wsC.Cells(fD, cIdx).Interior.Color = RGB(255, 199, 199) ' Rojo Claro
+                        wsC.Cells(fD, cIdx).Interior.Color = RGB(255, 199, 199)
                         wsC.Cells(fD, cIdx + 1).Interior.Color = RGB(139, 0, 0): wsC.Cells(fD, cIdx + 1).Font.Color = vbWhite
                     End If
                 Next
@@ -139,42 +113,48 @@ Sub CompararHojas()
             fD = fD + 1
         End If
     Next
-
-    wsC.Columns.AutoFit
-    wsC.Activate: wsC.Range("B3").Select: ActiveWindow.FreezePanes = True
-    Application.ScreenUpdating = True: MsgBox "Auditoría finalizada. Estructura V1 replicada.", vbInformation
+    wsC.Columns.AutoFit: wsC.Activate: wsC.Range("B3").Select: ActiveWindow.FreezePanes = True
+    Application.ScreenUpdating = True: MsgBox "Cruce finalizado.", vbInformation
 End Sub
 
-' 4. EXPORTAR (Blindaje de ceros en libro nuevo)
+' 4. EXPORTAR (Pestañas Módulo 2 y Ceros Blindados)
 Sub ExportarDiferenciasV2()
     Dim wsC As Worksheet: On Error Resume Next: Set wsC = ThisWorkbook.Worksheets("COMPARACION"): On Error GoTo 0
     If wsC Is Nothing Then Exit Sub
-    
     Application.ScreenUpdating = False
-    Dim wbN As Workbook: Set wbN = Workbooks.Add: Dim wsN As Worksheet: Set wsN = wbN.Sheets(1)
+    Dim wbN As Workbook: Set wbN = Workbooks.Add
     
-    ' Bloqueo de formato Texto en el destino antes de recibir datos
-    wsN.Cells.NumberFormat = "@"
+    ' Crear pestañas si existen datos
+    ProcesarPestana wbN, wsC, "DIFERENTES", "Cambios (Diferentes)"
+    ProcesarPestana wbN, wsC, "SOLO EN V2", "Nuevos (Solo V2)"
     
-    wsC.Rows("1:2").Copy: wsN.Range("A1").PasteSpecial xlPasteAll
+    Application.DisplayAlerts = False
+    On Error Resume Next: wbN.Worksheets("Sheet1").Delete: On Error GoTo 0
+    Application.DisplayAlerts = True
     
-    Dim lrC As Long: lrC = wsC.Cells(Rows.Count, 1).End(xlUp).Row
-    Dim fDest As Long: fDest = 3
+    If wbN.Worksheets.Count > 0 Then wbN.Worksheets(1).Activate
+    Application.ScreenUpdating = True
+    MsgBox "Exportado correctamente con pestañas y ceros protegidos.", vbInformation
+End Sub
+
+Private Sub ProcesarPestana(wbDest As Workbook, wsOrig As Worksheet, criterio As String, nombreHoja As String)
+    Dim lr As Long: lr = wsOrig.Cells(Rows.Count, 1).End(xlUp).Row
+    Dim fD As Long: fD = 3: Dim i As Long, hay As Boolean: hay = False
     
-    For i = 3 To lrC
-        If wsC.Cells(i, 1).Value = "DIFERENTES" Then
-            wsC.Rows(i).Copy
-            wsN.Rows(fDest).PasteSpecial xlPasteAll
-            fDest = fDest + 1
+    For i = 3 To lr: If wsOrig.Cells(i, 1).Value = criterio Then: hay = True: Exit For: Next i
+    If Not hay Then Exit Sub ' Si no hay datos de este tipo, no creamos la hoja
+    
+    Dim wsN As Worksheet: Set wsN = wbDest.Worksheets.Add(After:=wbDest.Worksheets(wbDest.Worksheets.Count))
+    wsN.Name = nombreHoja: wsN.Cells.NumberFormat = "@" ' Formato Texto
+    wsOrig.Rows("1:2").Copy: wsN.Rows(1).PasteSpecial xlPasteAll
+    
+    For i = 3 To lr
+        If wsOrig.Cells(i, 1).Value = criterio Then
+            wsOrig.Rows(i).Copy
+            wsN.Rows(fD).PasteSpecial xlPasteAll
+            wsN.Rows(fD).NumberFormat = "@" ' Refuerzo post-pegado
+            fD = fD + 1
         End If
     Next
-    
-    If fDest = 3 Then
-        wbN.Close False: MsgBox "No hay diferencias marcadas.", vbInformation: Exit Sub
-    End If
-    
-    wsN.Name = "Diferencias_" & Format(Date, "ddmmyy")
-    wsN.Columns.AutoFit
-    Application.CutCopyMode = False: Application.ScreenUpdating = True
-    MsgBox "Exportación exitosa en libro independiente.", vbInformation
+    wsN.Columns.AutoFit: wsN.Range("B3").Select: ActiveWindow.FreezePanes = True
 End Sub
